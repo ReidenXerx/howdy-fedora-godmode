@@ -62,7 +62,7 @@ echo "📦 Installing Python modules..."
 sudo pip3 install opencv-python face_recognition --break-system-packages
 
 echo "🧱 Cloning and building dlib..."
-cd ~/Downloads
+cd $(xdg-user-dir DOWNLOAD)
 rm -rf dlib || true
 git clone https://github.com/davisking/dlib.git
 cd dlib
@@ -92,7 +92,7 @@ globals().update({k: getattr(_dlib_pybind11, k) for k in dir(_dlib_pybind11) if 
 EOF
 
 echo "🐼 Cloning and building Howdy..."
-cd ~/Downloads
+cd $(xdg-user-dir DOWNLOAD)
 rm -rf howdy || true
 git clone https://github.com/boltgolt/howdy.git
 cd howdy
