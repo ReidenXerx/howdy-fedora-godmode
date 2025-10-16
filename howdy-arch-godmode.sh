@@ -1,12 +1,11 @@
-
 #!/bin/bash
 
 set -e
 
 # Automatically detect Python version
 PYVER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-PYTHON_SITE="/usr/lib64/python${PYVER}/site-packages"
-HOWDY_DIR="/usr/lib64/howdy"
+PYTHON_SITE="/usr/lib/python${PYVER}/site-packages"
+HOWDY_DIR="/usr/lib/howdy"
 
 # Function to patch cv2 import using absolute path
 patch_cv2_import() {
@@ -15,7 +14,7 @@ patch_cv2_import() {
 import importlib.util
 import os
 
-cv2_path = "/usr/local/lib64/python3.13/site-packages/cv2/cv2.abi3.so"
+cv2_path = "/usr/lib/python3.13/site-packages/cv2/cv2.abi3.so"
 spec = importlib.util.spec_from_file_location("cv2", cv2_path)
 cv2 = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cv2)'
@@ -47,49 +46,21 @@ spec.loader.exec_module(cv2)'
   fi
 }
 
-echo "🚀 Starting Howdy Fedora Godmode installation"
+echo "🚀 Starting Howdy Arch/EndeavourOS Godmode installation"
 
 echo "📦 Installing system dependencies..."
-sudo dnf install -y \
-  cmake make gcc gcc-c++ kernel-devel \
-  python3 python3-devel python3-pip python3-wheel \
-  python3-setuptools pam-devel boost-devel \
-  libevdev-devel inih-devel \
-  python3-numpy python3-pillow python3-pyudev python3-click \
-  v4l-utils
+sudo pacman -S --needed --noconfirm \
+  cmake make gcc linux-headers \
+  python python-pip python-wheel \
+  python-setuptools pam boost \
+  libevdev libinih \
+  python-numpy python-pillow python-pyudev python-click \
+  v4l-utils meson ninja
 
 echo "📦 Installing Python modules..."
 sudo pip3 install opencv-python face_recognition --break-system-packages
 
-echo "🧱 Cloning and building dlib..."
-cd $(xdg-user-dir DOWNLOAD)
-rm -rf dlib || true
-git clone https://github.com/davisking/dlib.git
-cd dlib
-mkdir build && cd build
-cmake ..
-cmake --build . --config Release
-cd ..
-sudo python3 setup.py install --set DLIB_USE_CUDA=0
-
-echo "🔁 Moving dlib to system site-packages..."
-sudo mkdir -p $PYTHON_SITE/dlib
-sudo cp -r /usr/local/lib64/python${PYVER}/site-packages/dlib* $PYTHON_SITE/
-sudo cp /usr/local/lib64/python${PYVER}/site-packages/_dlib_pybind11*.so $PYTHON_SITE/dlib/
-
-echo "🛠 Creating dlib/__init__.py with absolute _dlib_pybind11 import..."
-sudo tee $PYTHON_SITE/dlib/__init__.py > /dev/null << EOF
-import sys
-import os
-import importlib.util
-
-so_path = os.path.join(os.path.dirname(__file__), '_dlib_pybind11.cpython-313-x86_64-linux-gnu.so')
-spec = importlib.util.spec_from_file_location("_dlib_pybind11", so_path)
-_dlib_pybind11 = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(_dlib_pybind11)
-
-globals().update({k: getattr(_dlib_pybind11, k) for k in dir(_dlib_pybind11) if not k.startswith("__")})
-EOF
+echo "✅ dlib already installed, skipping build"
 
 echo "🐼 Cloning and building Howdy..."
 cd $(xdg-user-dir DOWNLOAD)
@@ -103,8 +74,7 @@ sudo ninja install
 
 echo "🔗 Linking pam_howdy.so to standard PAM path..."
 sudo mkdir -p /lib/security
-sudo cp /usr/local/lib64/security/pam_howdy.so /usr/lib64/security/
-sudo ln -sf /usr/lib64/security/pam_howdy.so /lib/security/pam_howdy.so
+sudo cp -f /usr/lib/security/pam_howdy.so /lib/security/pam_howdy.so || echo "PAM module already linked"
 
 echo "🧠 Patching Howdy modules with absolute cv2 import..."
 patch_cv2_import $HOWDY_DIR/compare.py
@@ -128,7 +98,6 @@ PAM_FILES=(
   /etc/pam.d/gdm-fingerprint
   /etc/pam.d/login
   /etc/pam.d/system-auth
-  /etc/pam.d/password-auth
   /etc/pam.d/su
 )
 
